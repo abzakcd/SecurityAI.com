@@ -1,59 +1,66 @@
-// הכרזה על משתנים גלובליים
-let video = null; // אלמנט וידאו
-let detector = null; // אובייקט הזיהוי
-let detections = []; // אחסון לתוצאות הזיהוי
-let videoVisibility = true; // האם הוידאו גלוי
-let detecting = false; // האם תהליך הזיהוי פעיל
+// Global variable declarations
+let video = null; // Video element
+let detector = null; // Object detection object
+let detections = []; // Storage for detection results
+let videoVisibility = true; // Is the video visible
+let detecting = false; // Is the detection process active
 let objectCount = 0;
-var cunter=0; // ספירה לבדיקת אובייקט
+var counter = 0; // Object counter for checking
+console.log(detections);
 
-
-// אלמנטי HTML גלובליים
+// Global HTML elements
 const toggleVideoEl = document.getElementById('toggleVideoEl');
 const toggleDetectingEl = document.getElementById('toggleDetectingEl');
 
-// הגדרת סמן להמתנה עד שהוידאו יטען
+// Set a cursor indicator while waiting for the video to load
 document.body.style.cursor = 'wait';
 
-// הפונקציה preload() נקראת אם קיימת, לפני הפונקציה setup()
+// The preload() function is called, if it exists, before the setup() function
 function preload() {
-  // יצירת אובייקט הזיהוי ממודל "cocossd"
+  // Create an object detector with the "cocossd" model
   detector = ml5.objectDetector('cocossd');
-  console.log('אובייקט הזיהוי נטען');
+  console.log('Object detector loaded');
 }
 
-// הפונקציה setup() נקראת פעם אחת בעת התחלת התוכנית
+// The setup() function is called once at the beginning of the program
 function setup() {
-  // יצירת אלמנט קנבס בגודל 640 רוחב על 480 גובה בפיקסלים
+  // Create a canvas element with a width of 640 and height of 480 pixels
   createCanvas(640, 480);
-  // יצירת אלמנט וידאו חדש המצלם את זרם האודיו/הוידאו ממצלמת הרשת
-  // האלמנט נפרד מהקנבס ומוצג כברירת מחדל
+  // Create a video element capturing the audio/video stream from the user's camera
+  // The video element is separate from the canvas and initially visible
   video = createCapture(VIDEO);
   video.size(640, 480);
-  console.log('יצירת אלמנט הוידאו');
+  console.log('Video element created');
   video.elt.addEventListener('loadeddata', function() {
-    // שינוי סמן העכבר למצב המחכה עד שהוידאו יהיה טעון
+    // Change the cursor indicator to default once the video is loaded
     if (video.elt.readyState >= 2) {
       document.body.style.cursor = 'default';
-      console.log('אלמנט הוידאו מוכן! לחץ על "התחל זיהוי" כדי לראות את הקסם!');
+      console.log('Video element ready! Click "Start Detection" to see the magic!');
     }
   });
 }
 
-// הפונקציה draw() מופעלת באופן תמידי עד שהפונקציה noLoop() נקראת
+// The draw() function is called continuously until the noLoop() function is called
 function draw() {
   if (!video || !detecting) return;
-  // ציור הפריים של הוידאו על הקנבס ומצביע על הפינה השמאלית-עליונה
+  // Draw the video frame on the canvas, pointing to the top-left corner
   image(video, 0, 0);
-  // ציור כל האובייקטים שנזהו על הקנבס
+  // Draw all detected objects on the canvas
   for (let i = 0; i < detections.length; i++) {
-    drawResult(detections[i]);
-
+    // Check if the object is a person
+    if (isPerson(detections[i])) {
+      drawResult(detections[i]);
+    }
   }
 }
 
+// Additional function for checking the object type
+function isPerson(object) {
+  return object.label === 'person';
+}
+
 /*
-דוגמא לאובייקט שנזהה
+Example of a detected object:
 {
   "label": "person",
   "confidence": 0.8013999462127686,
@@ -68,71 +75,71 @@ function drawResult(object) {
   drawLabel(object);
 }
 
-// ציור מסגרת סביב האובייקט שנזהה
+// Draw a bounding box around the detected object
 function drawBoundingBox(object) {
-  // הגדרת צבע הקו
+  // Set the color of the outline
   stroke('green');
-  // רוחב הקו
+  // Set the width of the line
   strokeWeight(4);
-  // ביטול צביעת המשטח
+  // Do not fill the area inside the rectangle
   noFill();
-  // ציור מלבן - הקואורדינטות של הפינה השמאלית-עליונה, רוחב וגובה
+  // Draw a rectangle - coordinates of the top-left corner, width, and height
   rect(object.x, object.y, object.width, object.height);
 }
 
-// ציור תווית של האובייקט שנזהה (בתוך המלבן)
+// Draw a label inside the bounding box
 function drawLabel(object) {
-  // ביטול ציור קו הגבול
+  // Do not draw the boundary line
   noStroke();
-  // הגדרת צבע המילוי
+  // Set the fill color
   fill('white');
-  // הגדרת גודל הגופן
+  // Set the font size
   textSize(24);
-  // ציור מחרוזת טקסט על הקנבס
+  // Draw a text string on the canvas
   text(object.label, object.x + 10, object.y + 24);
   countObjects(object);
 }
 
-// פונקציה callback - נקראת כאשר נמצא אובייקט
+// Function callback - called when an object is detected
 function onDetected(error, results) {
   if (error) {
     console.error(error);
   }
   detections = results;
-  // המשך זיהוי אובייקטים
+  // Continue detecting objects
   if (detecting) {
     detect();
   }
 }
 
-// הפעלת פעולת הזיהוי
+// Start the detection process
 function detect() {
-  // הוראה לאובייקט "detector" להתחיל לזהות אובייקטים מהוידאו
-  // ולקרוא לפונקציה "onDetected" כאשר יתגלה אובייקט
+  // Instruct the "detector" object to start detecting objects from the video
+  // and call the "onDetected" function when an object is detected
   detector.detect(video, onDetected);
 }
 
-// פונקציה לשינוי נראות הווידאו
+// Function to toggle the visibility of the video
 function toggleVideo() {
   if (!video) return;
   if (videoVisibility) {
     video.hide();
-    toggleVideoEl.innerText = 'הצג וידאו';
+    toggleVideoEl.innerText = 'Show Video';
   } else {
     video.show();
-    toggleVideoEl.innerText = 'הסתר וידאו';
+    toggleVideoEl.innerText = 'Hide Video';
   }
   videoVisibility = !videoVisibility;
 }
 
-// פונקציה להפעלה/כיבוי של פעולת הזיהוי
+// Function to start/stop the detection process
 function toggleDetecting() {
   if (!video || !detector) return;
   if (!detecting) {
     detect();
-    toggleDetectingEl.innerText = 'עצור זיהוי';
+    toggleDetectingEl.innerText = 'Stop Detection';
   } else {
-    toggleDetectingEl.innerText = 'התחל זיהוי';
+    toggleDetectingEl.innerText = 'Start Detection';
   }
   detecting = !detecting;
 }
@@ -140,28 +147,24 @@ function toggleDetecting() {
 function countObjects(object) {
   objectCount = detections.length;
 
-  console.log('מספר האובייקטים: ' + objectCount);
-  if(object.label === "person"){
+  console.log('Number of objects: ' + objectCount);
+  if (isPerson(object)) {
+    console.log(object);
 
-    setInterval(function() {cunter++; console.log(cunter)}, 2000);
+    setInterval(function() {
+      counter++;
+      console.log(counter);
+    }, 2000);
 
-    if(cunter===5){
-      cunter=0;
-      alert('סכנה גנב');
+    if (counter === 5) {
+      counter = 0;
+      alert('Thief alert');
       location.reload();
     }
-
   }
-
 }
 
-
-
-
-
-//----------------------------
-
-
+// Notification function
 function notifyMe() {
   if (!("Notification" in window)) {
     // Check if the browser supports notifications
@@ -169,22 +172,19 @@ function notifyMe() {
   } else if (Notification.permission === "granted") {
     // Check whether notification permissions have already been granted;
     // if so, create a notification
-    const notification = new Notification("סכנה");
+    const notification = new Notification("Alert");
     // …
   } else if (Notification.permission !== "denied") {
     // We need to ask the user for permission
     Notification.requestPermission().then((permission) => {
       // If the user accepts, let's create a notification
       if (permission === "granted") {
-        const notification = new Notification("סכנה גנב");
+        const notification = new Notification("Thief alert");
         // …
       }
     });
   }
 
-  // At last, if the user has denied notifications, and you
+  // If the user has denied notifications, and you
   // want to be respectful there is no need to bother them anymore.
 }
-
-
-
